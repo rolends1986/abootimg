@@ -85,7 +85,7 @@ typedef struct
   char*        second;
 } t_abootimg;
 
-
+#define HUAWEI_OFFSET   0x1000
 #define MAX_CONF_LEN    4096
 char config_args[MAX_CONF_LEN] = "";
 
@@ -365,6 +365,8 @@ void open_bootimg(t_abootimg* img, char* mode)
 
 void read_header(t_abootimg* img)
 {
+   fseek(img->stream, HUAWEI_OFFSET, SEEK_SET);
+
   size_t rb = fread(&img->header, sizeof(boot_img_hdr), 1, img->stream);
   if ((rb!=1) || ferror(img->stream))
     abort_perror(img->fname);
@@ -524,8 +526,11 @@ void update_images(t_abootimg *img)
   unsigned m = (rsize + page_size - 1) / page_size;
   unsigned o = (ssize + page_size - 1) / page_size;
 
-  unsigned roffset = (1+n)*page_size;
-  unsigned soffset = (1+n+m)*page_size;
+  unsigned roffset = (1+n)*page_size + HUAWEI_OFFSET;
+  unsigned soffset = (1+n+m)*page_size + HUAWEI_OFFSET;
+
+  // unsigned roffset = (1+n)*page_size;
+  // unsigned soffset = (1+n+m)*page_size;
 
   if (img->kernel_fname) {
     printf("reading kernel from %s\n", img->kernel_fname);
@@ -652,7 +657,7 @@ void write_bootimg(t_abootimg* img)
   unsigned m = (img->header.ramdisk_size + psize - 1) / psize;
   //unsigned o = (img->header.second_size + psize - 1) / psize;
 
-  if (fseek(img->stream, 0, SEEK_SET))
+  if (fseek(img->stream, HUAWEI_OFFSET, SEEK_SET))
     abort_perror(img->fname);
 
   fwrite(&img->header, sizeof(img->header), 1, img->stream);
@@ -674,7 +679,7 @@ void write_bootimg(t_abootimg* img)
   }
 
   if (img->ramdisk) {
-    if (fseek(img->stream, (1+n)*psize, SEEK_SET))
+    if (fseek(img->stream, (1+n)*psize+HUAWEI_OFFSET, SEEK_SET))
       abort_perror(img->fname);
 
     fwrite(img->ramdisk, img->header.ramdisk_size, 1, img->stream);
@@ -687,7 +692,7 @@ void write_bootimg(t_abootimg* img)
   }
 
   if (img->header.second_size) {
-    if (fseek(img->stream, (1+n+m)*psize, SEEK_SET))
+    if (fseek(img->stream, (1+n+m)*psize+HUAWEI_OFFSET, SEEK_SET))
       abort_perror(img->fname);
 
     fwrite(img->second, img->header.second_size, 1, img->stream);
@@ -778,11 +783,12 @@ void extract_kernel(t_abootimg* img)
 
   printf ("extracting kernel in %s\n", img->kernel_fname);
 
+
   void* k = malloc(ksize);
   if (!k)
     abort_perror(NULL);
 
-  if (fseek(img->stream, psize, SEEK_SET))
+  if (fseek(img->stream, psize + HUAWEI_OFFSET, SEEK_SET))
     abort_perror(img->fname);
 
   size_t rb = fread(k, ksize, 1, img->stream);
@@ -810,7 +816,7 @@ void extract_ramdisk(t_abootimg* img)
   unsigned rsize = img->header.ramdisk_size;
 
   unsigned n = (ksize + psize - 1) / psize;
-  unsigned roffset = (1+n)*psize;
+  unsigned roffset = (1+n)*psize+HUAWEI_OFFSET;
 
   printf ("extracting ramdisk in %s\n", img->ramdisk_fname);
 
@@ -850,7 +856,7 @@ void extract_second(t_abootimg* img)
     return;
 
   unsigned n = (rsize + ksize + psize - 1) / psize;
-  unsigned soffset = (1+n)*psize;
+  unsigned soffset = (1+n)*psize+HUAWEI_OFFSET;
 
   printf ("extracting second stage image in %s\n", img->second_fname);
 
